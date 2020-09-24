@@ -49,50 +49,104 @@ let randNum;
 let player1;
 let p1Votes = 0;
 let p2Votes = 0;
+let roundNum = 0;
+let gameStarted = false;
+let ready = false;
 let io = require("socket.io").listen(server);
+let playerWonTimer = 5;
+
+function newRound(){
+    let startRound = setInterval(function(){
+        playerWonTimer--;
+        io.emit('timer', playerWonTimer);
+        if(playerWonTimer <= 0){
+            clearInterval(startRound);
+            io.to(users[0]).emit('resetRound');
+            playerWonTimer = 5;
+        }
+    },1000)
+}
+function voteTimer(){
+    let voteTime = 5;
+    console.log("votingtime");
+    let votingInterval = setInterval(function(){
+        voteTime--;
+        io.emit('timer', voteTime);
+        if(voteTime <= 0){
+            clearInterval(votingInterval);
+            if(p1Votes > p2Votes){
+                io.emit('winner',["P1",p1Votes]);
+            }else if(p1Votes < p2Votes){
+            io.emit('winner',["P2",p2Votes]);
+            }else if(p1Votes == p2Votes){
+                io.emit('tie', p1Votes);
+            }
+            newRound();
+        }
+    },1000)
+}
 io.sockets.on('connection', (socket) =>{
     console.log('client connected with ' + socket.id);
     users.push(socket.id);
     socket.emit('join',(gameState));
     console.log(users);
+    if(users.length >= 2 && gameStarted == false){
+        ready = true;
+        console.log("ready");
+        io.emit('readyButton', ready);
+    }
     socket.on("newRound",()=>{
+        roundNum++;
+        gameStarted = true;
         p1Votes = 0;
         p2Votes = 0;
-        randNum = users[Math.floor(Math.random(0, users.length))];
+        randNum = users[Math.floor(Math.random() * users.length)];
         if(users.length >= 2){
             io.to(randNum).emit('playerNumber', 1);
             player1 = randNum;
-            randNum = users[Math.round(Math.random(0, users.length))];
+            randNum = users[Math.floor(Math.random() * users.length)];
+            console.log(randNum + " is P1");
             while(randNum == player1){
-                randNum = users[Math.floor(Math.random(0, users.length))];
+                randNum = users[Math.floor(Math.random() * users.length)];
             } 
-            io.to(randNum).emit('playerNumber', 2);
+            if(randNum != player1){
+                io.to(randNum).emit('playerNumber', 2);
+                console.log(randNum + " is P2");
+                console.log("work please");
+            }
         }
-        let timer = 1;
+        let timer = 5;
         let timerInterval = setInterval(function(){
             timer--;
             io.emit('timer', timer);
             if(timer <= 0){
                 clearInterval(timerInterval);
                 io.emit('voting');
+                voteTimer();
             }
         },1000)
-        io.emit('newRound', prompts[Math.floor(Math.random(0,prompts.length))]);
+        io.emit('newRound', [prompts[Math.round(Math.random() * prompts.length)], roundNum]);
     })
     socket.on('vote',(player)=>{
         if(player == 1){
             p1Votes++;
+            console.log(p1Votes);
         }
         else if (player == 2){
             p2Votes++;
+            console.log(p2Votes);
         }
-        console.log(p2Votes);
         io.emit('vote',[p1Votes,p2Votes]);
+        
     })
     socket.on("disconnect", ()=>{
         console.log(socket.id + " has disconnected");
         users.splice(users.indexOf(socket.id),1);
         console.log(users);
+        if(users.length < 2 && gameStarted == false){
+            ready = false;
+            io.emit('readyButton', ready);
+        }
     })
 
 
