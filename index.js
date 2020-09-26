@@ -43,7 +43,7 @@ let gameStateP2 = [
 
 ];
 
-let prompts = ["cat","dog","parrot","elephant","giraffe"];
+let prompts = ["Cat","Dog","Parrot","Elephant","Giraffe"];
 let users = [];
 let randNum;
 let player1;
@@ -98,6 +98,17 @@ io.sockets.on('connection', (socket) =>{
     socket.on("newRound",()=>{
         roundNum++;
         gameStarted = true;
+        let timer = 5;
+        let timerInterval = setInterval(function(){
+            timer--;
+            io.emit('timer', timer);
+            if(timer <= 0){
+                clearInterval(timerInterval);
+                io.emit('voting');
+                voteTimer();
+            }
+        },1000)
+        io.emit('newRound', [prompts[Math.floor(Math.random() * prompts.length)], roundNum]);
         p1Votes = 0;
         p2Votes = 0;
         randNum = users[Math.floor(Math.random() * users.length)];
@@ -115,17 +126,6 @@ io.sockets.on('connection', (socket) =>{
                 console.log("work please");
             }
         }
-        let timer = 5;
-        let timerInterval = setInterval(function(){
-            timer--;
-            io.emit('timer', timer);
-            if(timer <= 0){
-                clearInterval(timerInterval);
-                io.emit('voting');
-                voteTimer();
-            }
-        },1000)
-        io.emit('newRound', [prompts[Math.round(Math.random() * prompts.length)], roundNum]);
     })
     socket.on('vote',(player)=>{
         if(player == 1){
